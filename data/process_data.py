@@ -35,6 +35,7 @@ def clean_data(df):
     categories['index'] = categories.index
     df = pd.merge(df, categories, on='index', how='inner')
     df = df.drop('index', axis=1)
+    df = df.drop(df[df['related'] == '2'].index)
     print('number duplicated', df.duplicated().sum())
     print('drop_duplicates')
     df = df.drop_duplicates()
