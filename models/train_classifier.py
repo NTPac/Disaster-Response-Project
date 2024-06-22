@@ -18,12 +18,23 @@ import nltk
 nltk.download('punkt')
 nltk.download('wordnet')
 
-def load_data(database_filepath):
+def load_data(database_filepath: str):
+    """Load data
+
+    Args:
+        database_filepath (str): filepath
+
+    Returns:
+        _type_: X, Y, list categlories
+    """
     print('-----------start load_data------------')
     engine = create_engine('sqlite:///'+database_filepath)
     df = pd.read_sql_table(database_filepath.replace('.db',''), engine)
+    related_id = list(df.columns).index("related")
+    df = df.drop(df[~df['related'].isin([0,1])].index)
+    df = df.drop(df[~df['related'].isin(["0","1"])].index)
     X = df.message
-    Y = df[df.columns[4:]]
+    Y = df[df.columns[related_id:]]
     cols = list(Y.columns)
     print('-----------end load_data------------')
     return X, Y, cols
