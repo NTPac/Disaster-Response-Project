@@ -2,7 +2,16 @@ import sys
 import pandas as pd
 from sqlalchemy import create_engine
 
-def load_data(messages_filepath, categories_filepath):
+def load_data(messages_filepath: str, categories_filepath: str)-> pd.DataFrame:
+    """
+        Load and merge message and categories data
+    Args:
+        messages_filepath (str): message csv filepath
+        categories_filepath (str): categories csv filepath
+
+    Returns:
+        pd.DataFrame: data frome 2 csv
+    """
     print('-----------start load_data------------')
     messages = pd.read_csv(messages_filepath)
     categories = pd.read_csv(categories_filepath)
@@ -11,7 +20,15 @@ def load_data(messages_filepath, categories_filepath):
     return df
 
 
-def clean_data(df):
+def clean_data(df: pd.DataFrame)-> pd.DataFrame:
+    """
+        ETL data
+    Args:
+        df (pd.DataFrame): dataframe after load data
+
+    Returns:
+        pd.DataFrame: data have cleaned
+    """
     print('-----------start clean data------------')
     print('explain categories')
     categories = df['categories'].str.split(';', expand=True)
@@ -35,7 +52,6 @@ def clean_data(df):
     categories['index'] = categories.index
     df = pd.merge(df, categories, on='index', how='inner')
     df = df.drop('index', axis=1)
-    df = df.drop(df[df['related'] == '2'].index)
     print('number duplicated', df.duplicated().sum())
     print('drop_duplicates')
     df = df.drop_duplicates()
@@ -45,10 +61,16 @@ def clean_data(df):
     
 
 
-def save_data(df, database_filename):
+def save_data(df: pd.DataFrame, database_filename: str):
+    """
+        Save data into database file
+    Args:
+        df (pd.DataFrame): data cleaned
+        database_filename (str): target database filename
+    """
     print('-----------start save_data------------')
     engine = create_engine('sqlite:///'+database_filename)
-    df.to_sql(database_filename.replace('.db',''), engine, index=False)
+    df.to_sql(database_filename.replace('.db',''), engine, index=False, if_exists='replace')
     print('-----------end save_data------------')
 
 
