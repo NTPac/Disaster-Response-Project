@@ -1,0 +1,6 @@
+sqlalchemy
+pandas
+nltk
+re
+scikit-learn
+pickle
