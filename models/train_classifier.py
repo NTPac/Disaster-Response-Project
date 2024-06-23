@@ -1,5 +1,6 @@
 import sys
 # import libraries
+from sklearn.base import BaseEstimator, TransformerMixin
 from sqlalchemy import create_engine
 import pandas as pd
 from nltk.tokenize import word_tokenize
@@ -12,11 +13,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.multioutput import MultiOutputClassifier
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.model_selection import GridSearchCV
 import nltk
 nltk.download('punkt')
 nltk.download('wordnet')
+nltk.download('averaged_perceptron_tagger')
 
 def load_data(database_filepath: str):
     """Load data
@@ -29,18 +31,27 @@ def load_data(database_filepath: str):
     """
     print('-----------start load_data------------')
     engine = create_engine('sqlite:///'+database_filepath)
-    df = pd.read_sql_table(database_filepath.replace('.db',''), engine)
+    df = pd.read_sql_table("message", engine)
     related_id = list(df.columns).index("related")
-    df = df.drop(df[~df['related'].isin([0,1])].index)
-    df = df.drop(df[~df['related'].isin(["0","1"])].index)
+    print(related_id)
     X = df.message
-    Y = df[df.columns[related_id:]]
+    Y = df.iloc[:,related_id:]
     cols = list(Y.columns)
+    print(df.shape)
+    print(cols)
     print('-----------end load_data------------')
     return X, Y, cols
 
 
 def tokenize(text):
+    """tokenize
+
+    Args:
+        text (_type_): message
+
+    Returns:
+        _type_: token
+    """
     print('-----------start tokenize------------')
     url_regex = 'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
     detected_urls = re.findall(url_regex, text)
@@ -59,27 +70,70 @@ def tokenize(text):
     return clean_tokens
 
 def build_model():
+    """build model
+
+    Returns:
+        _type_: _description_
+    """
     print('-----------start build_model------------')
+    # pipeline = Pipeline([
+    #     ('features', FeatureUnion([
+    #         ('text_pipeline', Pipeline([
+    #             ('count_vectorizer', CountVectorizer(tokenizer=tokenize)),
+    #             ('tfidf_transformer', TfidfTransformer())
+    #         ])),
+    #         ('starting_verb_transformer', StartingVerbExtractor())
+    #     ])),
+    #     ('clf', MultiOutputClassifier(RandomForestClassifier())),
+    # ])
+
     pipeline = Pipeline([
         ('vect', CountVectorizer(tokenizer=tokenize)),
         ('tfidf', TfidfTransformer()),
         ('clf', MultiOutputClassifier(RandomForestClassifier()))
     ])
+
     print('-----------end build_model------------')
     return pipeline
     
 
 
 def evaluate_model(model, X_test, Y_test, category_names):
+    """evaluate model
+
+    Args:
+        model (_type_): _description_
+        X_test (_type_): _description_
+        Y_test (_type_): _description_
+        category_names (_type_): _description_
+    """
     print('-----------start evaluate_model------------')
     Y_pred = model.predict(X_test)
     for col in category_names:
         index = category_names.index(col)
         print(col, ':')
-        print(classification_report(Y_test[col], Y_pred[:,index], target_names=category_names))
+        # print(classification_report(Y_test[col], Y_pred[:,index], target_names=category_names))
+        print(classification_report(Y_test[col], Y_pred[:,index]))
         print('----------------------------------------------------------------------')
     print('-----------end evaluate_model------------')
 
+class StartingVerbExtractor(BaseEstimator, TransformerMixin):
+
+    def starting_verb(self, text):
+        sentence_list = nltk.sent_tokenize(text)
+        for sentence in sentence_list:
+            pos_tags = nltk.pos_tag(tokenize(sentence))
+            first_word, first_tag = pos_tags[0]
+            if first_tag in ['VB', 'VBP'] or first_word == 'RT':
+                return 1
+        return 0
+
+    def fit(self, x, y=None):
+        return self
+
+    def transform(self, X):
+        X_tagged = pd.Series(X).apply(self.starting_verb)
+        return pd.DataFrame(X_tagged)
 
 def save_model(model, model_filepath):
     # Assuming you have a trained model called 'model'
@@ -103,13 +157,22 @@ def main():
         model = build_model()
         
         print('Training model...')
-        model.fit(X_train, Y_train)
-        
+        parameters = {
+            'clf__estimator__n_estimators': [20, 50, 100],
+            'clf__estimator__min_samples_split': [2],
+        }
+
+        cv = GridSearchCV(model, param_grid=parameters, n_jobs=4, verbose=2)
+
+        cv.fit(X_train, Y_train)
+        best_params = cv.best_params_
+        best_model = cv.best_estimator_
+
         print('Evaluating model...')
-        evaluate_model(model, X_test, Y_test, category_names)
+        evaluate_model(best_model, X_test, Y_test, category_names)
 
         print('Saving model...\n    MODEL: {}'.format(model_filepath))
-        save_model(model, model_filepath)
+        save_model(best_model, model_filepath)
 
         print('Trained model saved!')
 
