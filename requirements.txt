@@ -1,6 +1,6 @@
 sqlalchemy
 pandas
 nltk
-re
 scikit-learn
-pickle
+plotly
+flask
