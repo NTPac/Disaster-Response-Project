@@ -8,9 +8,9 @@ from nltk.tokenize import word_tokenize
 from flask import Flask
 from flask import render_template, request, jsonify
 from plotly.graph_objs import Bar
-from sklearn.externals import joblib
+# from sklearn.externals import joblib
+import joblib
 from sqlalchemy import create_engine
-
 
 app = Flask(__name__)
 
@@ -27,7 +27,7 @@ def tokenize(text):
 
 # load data
 engine = create_engine('sqlite:///../data/DisasterResponse.db')
-df = pd.read_sql_table('data/DisasterResponse', engine)
+df = pd.read_sql_table('message', engine)
 
 # load model
 model = joblib.load("../models/classifier.pkl")
@@ -42,7 +42,11 @@ def index():
     # TODO: Below is an example - modify to extract data for your own visuals
     genre_counts = df.groupby('genre').count()['message']
     genre_names = list(genre_counts.index)
-    
+    related_id = list(df.columns).index("related")
+    print(related_id)
+    Y = df.iloc[:,related_id:]
+    category_names = list(Y.columns)
+    category_boolean = (Y != "0").sum().values
     # create visuals
     # TODO: Below is an example - modify to create your own visuals
     graphs = [
@@ -61,6 +65,27 @@ def index():
                 },
                 'xaxis': {
                     'title': "Genre"
+                }
+            }
+        },
+
+        {
+            'data': [
+                Bar(
+                    x=category_names,
+                    y=category_boolean
+                )
+            ],
+
+            'layout': {
+                'title': 'Distribution of Message Categories',
+                'yaxis': {
+                    'title': "Count"
+                },
+                'xaxis': {
+                    'title': "response",
+                    'tickangle': 35,
+                    'categoryorder': "total descending"
                 }
             }
         }
