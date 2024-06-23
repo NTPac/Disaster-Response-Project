@@ -52,10 +52,13 @@ def clean_data(df: pd.DataFrame)-> pd.DataFrame:
     categories['index'] = categories.index
     df = pd.merge(df, categories, on='index', how='inner')
     df = df.drop('index', axis=1)
+    df.loc[df['related'] == '2','related'] = '1'
+    print("related unique", df['related'].unique())
     print('number duplicated', df.duplicated().sum())
     print('drop_duplicates')
     df = df.drop_duplicates()
     print('number duplicated', df.duplicated().sum())
+    print("shape", df.shape)
     print('-----------end clean data------------')
     return df
     
@@ -69,8 +72,9 @@ def save_data(df: pd.DataFrame, database_filename: str):
         database_filename (str): target database filename
     """
     print('-----------start save_data------------')
+    print("shape", df.shape)
     engine = create_engine('sqlite:///'+database_filename)
-    df.to_sql(database_filename.replace('.db',''), engine, index=False, if_exists='replace')
+    df.to_sql("message", engine, index=False, if_exists='replace')
     print('-----------end save_data------------')
 
 
